@@ -1,18 +1,20 @@
 package main
 
 import (
+	"strings"
 	"fmt"
 	"os"
 	"net"
-	"strconv"
+	"reflect"
 )
 
-var MAX_REQUEST_SIZE int64 = 1024
+var MAX_REQUEST_SIZE int16 = 1024
 var IP = "0.0.0.0:8000"
 
 type Request struct {
 	method string
 	path string
+	version string
 	headers map[string]string
 	body []byte
 }
@@ -24,20 +26,61 @@ type Respone struct {
 }
 
 func parse_request(request []byte) Request {
-	return Request{}
+	// Handling request line
+	fields := strings.Split(string(request), "\r\n") 
+	method := strings.Fields(fields[0])[0]
+	path := strings.Fields(fields[0])[1]
+	version := strings.Fields(fields[0])[2]
+
+	// Handling headers and body
+	headers := make(map[string]string)
+	var body []byte  
+
+	for i := 1; i < len(fields); i++ {
+		items := strings.SplitN(fields[i], ":", 2)
+		// In case we slice white spaces
+		if len(items) <= 1 { continue }
+		key := items[0]
+		value := items[1]
+
+		switch key {
+		case "body":
+			// TO DO: create body based on content lenght
+			// this is tmp
+			body = []byte(value)
+		default:
+			headers[key] = value
+		}
+	}
+	return Request{method: method, path: path, version: version, headers: headers, body: body}
+}
+
+func printStructFields(req Request) {
+	val := reflect.ValueOf(req)
+	typ := reflect.TypeOf(req)
+
+	for i := 0; i < val.NumField(); i++ {
+		field := typ.Field(i)
+		value := val.Field(i)
+
+		// Handle different types (e.g., []byte, map)
+		switch value.Kind() {
+		case reflect.Slice:
+			fmt.Printf("%s: %v\n", field.Name, value.Bytes())
+		case reflect.Map:
+			fmt.Printf("%s:\n", field.Name)
+			for _, key := range value.MapKeys() {
+				fmt.Printf("  %v: %v\n", key, value.MapIndex(key))
+			}
+		default:
+			fmt.Printf("%s: %v\n", field.Name, value)
+		}
+	}
 }
 
 func main () {
 	main_args := os.Args
 	if len(main_args) > 1 { IP = main_args[1] }
-	if len(main_args) > 2 { 
-		tmp, err := strconv.ParseInt(main_args[2], 10, 16)
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(0)
-		}
-		MAX_REQUEST_SIZE = tmp
-	}
 
 	fmt.Println("Starting server at", IP)
 	ln, err := net.Listen("tcp", IP)
@@ -47,7 +90,7 @@ func main () {
 	}
 
 	for {
-		_, err := ln.Accept()
+		conn, err := ln.Accept()
 		if err != nil {
 			fmt.Println("Failed to accept connection: ", err.Error())
 			os.Exit(1)
@@ -56,5 +99,12 @@ func main () {
 		// Parsing (Check if http request is valid and parse into struct)
 		// Route request (pass struct to the router and let it figure out) -> return resposne
 		// sent back response
+
+		request := make([]byte, MAX_REQUEST_SIZE)	
+		conn.Read(request)
+		parsed_req := parse_request(request)
+
+		printStructFields(parsed_req)
+
 	}
 }
