@@ -1,31 +1,19 @@
 package main
 
 import (
-	"strings"
 	"fmt"
-	"os"
 	"net"
+	"os"
 	"reflect"
+	"snaczek-server/coreutils"
+	"snaczek-server/router"
+	"strings"
 )
 
 var MAX_REQUEST_SIZE int16 = 1024
 var IP = "0.0.0.0:8000"
 
-type Request struct {
-	method string
-	path string
-	version string
-	headers map[string]string
-	body []byte
-}
-
-type Respone struct {
-	status_code int
-	headers map[string]string
-	body []byte
-}
-
-func parse_request(request []byte) Request {
+func parse_request(request []byte) coreutils.Request {
 	// Handling request line
 	fields := strings.Split(string(request), "\r\n") 
 	method := strings.Fields(fields[0])[0]
@@ -52,10 +40,41 @@ func parse_request(request []byte) Request {
 			headers[key] = value
 		}
 	}
-	return Request{method: method, path: path, version: version, headers: headers, body: body}
+	return coreutils.Request{Method: method, Path: path, Version: version, Headers: headers, Body: body}
 }
 
-func printStructFields(req Request) {
+func format_response(resp coreutils.Respone) []byte{
+	statusText := map[int]string{
+		200: "OK",
+		201: "Created",
+		400: "Bad Request",
+		404: "Not Found",
+		405: "Method Not Allowed",
+		500: "Internal Server Error",
+	}
+
+	statusMsg, exist := statusText[resp.Status_code]
+	if !exist {
+		statusMsg = "Unknow"
+	}
+
+	responseStr := fmt.Sprintf("HTTP/1.1 %d %s\r\n", resp.Status_code, statusMsg)
+
+	if resp.Headers == nil {
+		resp.Headers = make(map[string]string)
+	}
+	resp.Headers["Content-Length"] = fmt.Sprintf("%d", len(resp.Body))
+
+	for key, value := range resp.Headers {
+		responseStr += fmt.Sprintf("%s: %s\r\n", key, value)
+	}
+
+	full := append([]byte(responseStr), resp.Body...)
+	return full
+}
+
+
+func printStructFields(req coreutils.Request) {
 	val := reflect.ValueOf(req)
 	typ := reflect.TypeOf(req)
 
@@ -89,6 +108,15 @@ func main () {
 		os.Exit(1)
 	}
 
+	r := router.NewRouter()
+	r.RegisterRoute("GET", "/hello", func(req coreutils.Request) coreutils.Respone {
+		return coreutils.Respone{
+			Status_code: 200,
+			Headers: map[string]string{"Content-Type": "text/plain"},
+			Body: []byte("Hello from GET /hello"),
+		}
+	})
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -106,5 +134,9 @@ func main () {
 
 		printStructFields(parsed_req)
 
+
+		response := r.Route(parsed_req)
+		raw := format_response(response)
+		conn.Write(raw)
 	}
 }
