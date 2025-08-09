@@ -34,7 +34,13 @@ func main () {
 
 		request := make([]byte, MAX_REQUEST_SIZE)	
 		conn.Read(request)
-		parsed_req := coreutils.ParseRequest(request)
+		parsed_req, err := coreutils.ParseRequest(request)
+		if err != nil {
+			response := coreutils.BadRequestResponse("400 Bad Request: " + err.Error())
+			raw := coreutils.FormatResponse(response)
+			conn.Write(raw)
+		}
+		fmt.Println(parsed_req.Path + " " + parsed_req.Method)
 
 		response := r.Route(parsed_req)
 		raw := coreutils.FormatResponse(response)

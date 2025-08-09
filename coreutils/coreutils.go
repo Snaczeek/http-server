@@ -4,6 +4,7 @@ import (
 	"strings"
 	"strconv"
 	"fmt"
+	"net"
 )
 	
 type Request struct {
@@ -20,13 +21,62 @@ type Respone struct {
 	Body []byte
 }
 
-func ParseRequest(request []byte) Request {
+func isValidHost(host string) bool {
+	// Split into host and optional port
+	h, p, err := net.SplitHostPort(host)
+	if err != nil {
+		// No port case
+		h = host
+		p = ""
+	}
+
+	// Validate hostname or IP
+	if net.ParseIP(h) == nil {
+		if !isValidHostname(h) {
+			return false
+		}
+	}
+
+	// Validate port if present
+	if p != "" {
+		if _, err := strconv.Atoi(p); err != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isValidHostname(h string) bool {
+	// Hostname must be <= 253 chars and split into labels <= 63 chars
+	if len(h) == 0 || len(h) > 253 {
+		return false
+	}
+	labels := strings.Split(h, ".")
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+		// Only letters, digits, hyphen, and can't start/end with hyphen
+		for i, c := range label {
+			if !(c == '-' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
+				return false
+			}
+			if (i == 0 || i == len(label)-1) && c == '-' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func ParseRequest(request []byte) (Request, error) {
 	raw := string(request)
 
 	// Split into header and body
 	parts := strings.SplitN(raw, "\r\n\r\n", 2)
 	if len(parts) < 2 {
-		return Request{}
+		return Request{}, fmt.Errorf("Invalid request: no headers/body seperation")
 	}
 	headerPart := parts[0]
 	bodyPart := parts[1]
@@ -38,7 +88,7 @@ func ParseRequest(request []byte) Request {
 	// Parse request line
 	fields := strings.Fields(requestLine)
 	if len(fields) < 3 {
-		return Request{}
+		return Request{}, fmt.Errorf("Invalid reqeust line")
 	}
 	method := fields[0]
 	path := fields[1]
@@ -55,6 +105,14 @@ func ParseRequest(request []byte) Request {
 		headers[key] = value
 	}
 
+	// HTTP/1.1 Host header check
+	if version == "HTTP/1.1" {
+		host, ok := headers["Host"]
+		if !ok || !isValidHost(host) {
+			return Request{}, fmt.Errorf("invalid or missing host name")
+		}
+	}
+
 	var body []byte
 	if lengthStr, ok := headers["Content-Length"]; ok {
 		if length, err := strconv.Atoi(lengthStr); err == nil && length <= len(bodyPart) {
@@ -68,7 +126,7 @@ func ParseRequest(request []byte) Request {
 		Version: version,
 		Headers: headers,
 		Body:    body,
-	}
+	}, nil
 }
 
 func FormatResponse(resp Respone) []byte{
@@ -101,4 +159,17 @@ func FormatResponse(resp Respone) []byte{
 
 	full := append([]byte(responseStr), resp.Body...)
 	return full
+}
+
+func BadRequestResponse(message string) Respone {
+	body := []byte(message + "\n")
+	return Respone{
+		Status_code: 400,
+		Headers: map[string]string{
+			"Content-Type":   "text/plain; charset=utf-8",
+			"Content-Length": fmt.Sprintf("%d", len(body)),
+			"Connection":     "close", 
+		},
+		Body: body,
+	}
 }
