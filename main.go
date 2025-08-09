@@ -1,15 +1,54 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
 	"snaczek-server/coreutils"
 	"snaczek-server/router"
+	"strings"
+	"time"
 )
 
 var MAX_REQUEST_SIZE int16 = 1024
 var IP = "0.0.0.0:8000"
+
+func handleConnection(conn net.Conn, r *router.Router) {
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
+	for {
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+		request := make([]byte, MAX_REQUEST_SIZE)
+		n, err := reader.Read(request)
+		if err != nil {
+			return // Connection close/timeout
+		}
+
+		parsedReq, err := coreutils.ParseRequest(request[:n])
+		if err != nil {
+			resp := coreutils.BadRequestResponse("400 Bad Request: " + err.Error())
+			conn.Write(coreutils.FormatResponse(resp))
+			return
+		}
+
+		fmt.Println(parsedReq.Method, parsedReq.Path)
+
+		resp := r.Route(parsedReq)
+
+		// Persistent connection handling
+		connHeader := strings.ToLower(parsedReq.Headers["Connection"])
+		if connHeader == "close" {
+			resp.Headers["Connection"] = "close"
+			return 
+		} else {
+			resp.Headers["Connection"] = "keep-alive"
+			conn.Write(coreutils.FormatResponse(resp))
+		}
+	}
+}
 
 func main () {
 	main_args := os.Args
@@ -29,21 +68,9 @@ func main () {
 		conn, err := ln.Accept()
 		if err != nil {
 			fmt.Println("Failed to accept connection: ", err.Error())
-			os.Exit(1)
+			continue
 		}
 
-		request := make([]byte, MAX_REQUEST_SIZE)	
-		conn.Read(request)
-		parsed_req, err := coreutils.ParseRequest(request)
-		if err != nil {
-			response := coreutils.BadRequestResponse("400 Bad Request: " + err.Error())
-			raw := coreutils.FormatResponse(response)
-			conn.Write(raw)
-		}
-		fmt.Println(parsed_req.Path + " " + parsed_req.Method)
-
-		response := r.Route(parsed_req)
-		raw := coreutils.FormatResponse(response)
-		conn.Write(raw)
+		go handleConnection(conn, r)
 	}
 }

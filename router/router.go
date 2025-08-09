@@ -29,7 +29,7 @@ func (r *Router) Route(req coreutils.Request) coreutils.Respone {
 		return coreutils.Respone {
 			Status_code: 404,
 			Headers: map[string]string{"Content-Type": "text/plain"},
-			Body: []byte("404 Not Found"),
+			Body: []byte("404 Not Found\n"),
 		} 
 	}
 
@@ -38,7 +38,7 @@ func (r *Router) Route(req coreutils.Request) coreutils.Respone {
 		return coreutils.Respone {
 			Status_code: 405,
 			Headers: map[string]string{"Content-Type": "text/plain"},
-			Body: []byte("405 Method Not Allowed"),
+			Body: []byte("405 Method Not Allowed\n"),
 		} 
 	}
 
