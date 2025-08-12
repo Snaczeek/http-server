@@ -2,16 +2,19 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"snaczek-server/coreutils"
 	"snaczek-server/router"
+	"strconv"
 	"strings"
 	"time"
 )
 
-var MAX_REQUEST_SIZE int16 = 1024
 var IP = "0.0.0.0:8000"
 
 func handleConnection(conn net.Conn, r *router.Router) {
@@ -21,13 +24,19 @@ func handleConnection(conn net.Conn, r *router.Router) {
 	for {
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		request := make([]byte, MAX_REQUEST_SIZE)
-		n, err := reader.Read(request)
+		request, err := readHTTPRequest(reader)
 		if err != nil {
-			return // Connection close/timeout
+			if errors.Is(err, os.ErrDeadlineExceeded){
+				fmt.Println("Connection timeout")
+			} else if err == io.EOF {
+				fmt.Println("Client closed connection")
+			} else {
+				fmt.Print("Read error:", err)
+			}
+			return
 		}
 
-		parsedReq, err := coreutils.ParseRequest(request[:n])
+		parsedReq, err := coreutils.ParseRequest(request)
 		if err != nil {
 			resp := coreutils.BadRequestResponse("400 Bad Request: " + err.Error())
 			conn.Write(coreutils.FormatResponse(resp))
@@ -48,6 +57,54 @@ func handleConnection(conn net.Conn, r *router.Router) {
 			conn.Write(coreutils.FormatResponse(resp))
 		}
 	}
+}
+
+func readHTTPRequest(reader *bufio.Reader) ([]byte, error) {
+	var buffer bytes.Buffer
+
+	// Read headers
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		buffer.WriteString(line)
+		if line == "\r\n" {
+			break
+		}
+	}
+
+	// Handle body
+	headers := parseTmpHeaders(buffer.Bytes())
+	if clStr, ok := headers["Content-Length"]; ok {
+		cl, err := strconv.Atoi(clStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid Content-Length")
+		}
+		body := make([]byte, cl)
+		_, err = io.ReadFull(reader, body)
+		if err != nil {
+			return nil, err
+		}
+		buffer.Write(body)
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func parseTmpHeaders(raw []byte) map[string]string {
+	headers := make(map[string]string)
+	lines := strings.Split(string(raw), "\r\n")
+	for _, line := range lines[1:] { // Skip request line
+		if line == "" {
+			break
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) == 2 {
+			headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+	return headers
 }
 
 func main () {
