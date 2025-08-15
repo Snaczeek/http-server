@@ -13,9 +13,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"compress/gzip"
 )
 
 var IP = "0.0.0.0:8000"
+var COMPRESSION_THRESHOLD = 500 // Default minimum 500 bytes  
 
 func handleConnection(conn net.Conn, r *router.Router) {
 	defer conn.Close()
@@ -46,6 +48,18 @@ func handleConnection(conn net.Conn, r *router.Router) {
 		fmt.Println(parsedReq.Method, parsedReq.Path)
 
 		resp := r.Route(parsedReq)
+		acceptEnc := parsedReq.Headers["Accept-Encoding"]
+
+		// Compression handling
+		if strings.Contains(acceptEnc, "gzip") && len(resp.Body) >= COMPRESSION_THRESHOLD{
+			var buf bytes.Buffer
+			gz := gzip.NewWriter(&buf)
+			gz.Write(resp.Body)
+			gz.Close()
+
+			resp.Body = buf.Bytes()
+			resp.Headers["Content-Encoding"] = "gzip"
+		}
 
 		// Persistent connection handling
 		connHeader := strings.ToLower(parsedReq.Headers["Connection"])
