@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"fmt"
 	"net"
+	"time"
 )
 	
 type Request struct {
@@ -150,6 +151,9 @@ func FormatResponse(resp Respone) []byte{
 		resp.Headers = make(map[string]string)
 	}
 	resp.Headers["Content-Length"] = fmt.Sprintf("%d", len(resp.Body))
+	curr_date := time.Now().UTC().Format(time.RFC1123)
+	curr_date = fmt.Sprintf("%sGMT", curr_date[:len(curr_date)-3])
+	resp.Headers["Date"] = curr_date
 
 	for key, value := range resp.Headers {
 		responseStr += fmt.Sprintf("%s: %s\r\n", key, value)
