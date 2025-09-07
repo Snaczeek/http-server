@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+	"encoding/json"
+	"errors"
 )
 	
 type Request struct {
@@ -176,4 +178,20 @@ func BadRequestResponse(message string) Respone {
 		},
 		Body: body,
 	}
+}
+
+func ParseJSONBody[T any](req Request) (T, error) {
+	var data T
+	contentType := req.Headers["Content-Type"]
+
+	if contentType != "application/json" {
+		return data, errors.New("unsupported media type")
+	}
+
+	err := json.Unmarshal(req.Body, &data)
+	if err != nil {
+		return data, err
+	}
+
+	return data, nil
 }
