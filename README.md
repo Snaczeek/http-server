@@ -45,7 +45,7 @@ go run . 127.0.0.1:9000
 
 ---
 
-### How to Create Routes & Handlers
+## How to Create Routes & Handlers
 
 Handlers are just Go functions that:
 
@@ -82,4 +82,31 @@ curl http://0.0.0.0:8000/hello
 You will get: 
 ```bash
 Hello from GET /hello
+```
+
+---
+
+## Request & Response Structs
+
+### coreutils.Request
+
+```go
+type Request struct {
+	Method  string
+	Path    string
+	Version string
+	Headers map[string]string
+	Body    []byte
+}
+
+```
+
+### coreutils.Response
+```go
+type Response struct {
+	Status_code int
+	Headers     map[string]string
+	Body        []byte
+}
+
 ```
