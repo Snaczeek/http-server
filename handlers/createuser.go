@@ -9,10 +9,10 @@ type User struct {
 	Age  int    `json:"age"`
 }
 
-func CreateUserHandler(req coreutils.Request) coreutils.Respone {
+func CreateUserHandler(req coreutils.Request) coreutils.Response {
 	user, err := coreutils.ParseJSONBody[User](req)
 	if err != nil {
-		return coreutils.Respone{
+		return coreutils.Response{
 			Status_code: 400,
 			Headers: map[string]string{"Content-Type": "application/json"},
 			Body: []byte(`{"error":"invalid JSON"}`),
@@ -21,7 +21,7 @@ func CreateUserHandler(req coreutils.Request) coreutils.Respone {
 
 	responseBody := []byte(`{"message":"User created: ` + user.Name + `"}`)
 
-	return coreutils.Respone{
+	return coreutils.Response{
 		Status_code: 201,
 		Headers: map[string]string{
 			"Content-Type": "application/json",

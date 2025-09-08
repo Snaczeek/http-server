@@ -18,7 +18,7 @@ type Request struct {
 	Body []byte
 }
 
-type Respone struct {
+type Response struct {
 	Status_code int
 	Headers map[string]string
 	Body []byte
@@ -132,7 +132,7 @@ func ParseRequest(request []byte) (Request, error) {
 	}, nil
 }
 
-func FormatResponse(resp Respone) []byte{
+func FormatResponse(resp Response) []byte{
 	statusText := map[int]string{
 		200: "OK",
 		201: "Created",
@@ -167,9 +167,9 @@ func FormatResponse(resp Respone) []byte{
 	return full
 }
 
-func BadRequestResponse(message string) Respone {
+func BadRequestResponse(message string) Response {
 	body := []byte(message + "\n")
-	return Respone{
+	return Response{
 		Status_code: 400,
 		Headers: map[string]string{
 			"Content-Type":   "text/plain; charset=utf-8",

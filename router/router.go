@@ -4,7 +4,7 @@ import (
 	"snaczek-server/coreutils"
 )
 
-type HandelerFunction func(req coreutils.Request) coreutils.Respone
+type HandelerFunction func(req coreutils.Request) coreutils.Response
 
 type Router struct {
 	routes map[string]map[string]HandelerFunction // path -> method -> handler
@@ -23,10 +23,10 @@ func (r *Router) RegisterRoute(method string, path string, handler HandelerFunct
 	r.routes[path][method] = handler
 }
 
-func (r *Router) Route(req coreutils.Request) coreutils.Respone {
+func (r *Router) Route(req coreutils.Request) coreutils.Response {
 	path, ok := r.routes[req.Path]
 	if !ok {
-		return coreutils.Respone {
+		return coreutils.Response {
 			Status_code: 404,
 			Headers: map[string]string{"Content-Type": "text/plain"},
 			Body: []byte("404 Not Found\n"),
@@ -35,7 +35,7 @@ func (r *Router) Route(req coreutils.Request) coreutils.Respone {
 
 	handler, ok := path[req.Method]
 	if !ok {
-		return coreutils.Respone {
+		return coreutils.Response {
 			Status_code: 405,
 			Headers: map[string]string{"Content-Type": "text/plain"},
 			Body: []byte("405 Method Not Allowed\n"),
