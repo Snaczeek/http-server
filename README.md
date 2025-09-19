@@ -110,3 +110,5 @@ type Response struct {
 }
 
 ```
+## Performance
+[Benchmarks](./BENCHMARKS.md)

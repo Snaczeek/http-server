@@ -8,5 +8,6 @@ import (
 func RegisterAllRoutes(r *Router) {
 	r.RegisterRoute("GET", "/hello", handlers.HelloHandler)
 	r.RegisterRoute("POST", "/users", handlers.CreateUserHandler)
+	r.RegisterRoute("GET", "/json-test", handlers.JsonTestHandler)
 
 }
